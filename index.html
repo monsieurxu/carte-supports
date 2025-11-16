@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec centrage sur ma position</title>
+    <title>Carte Leaflet avec superposition</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -19,34 +19,35 @@
         #map {
             height: 100%;
             width: 100%;
+            position: relative;
+        }
+        #info, #geo {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 1000;
+            border-bottom: 1px solid #ccc;
         }
         #info {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            font-size: 20px;
-            font-weight: bold;
-            text-align: center;
-            border-bottom: 1px solid #ccc;
             height: 10vh;
-        }
-        #info div {
-            margin: 5px 0;
         }
         #geo {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 10px;
-            font-size: 20px;
-            font-weight: bold;
-            text-align: center;
-            border-bottom: 1px solid #ccc;
+            top: 10vh;
             height: 10vh;
         }
-        #geo div {
-            margin: 55px 0;
+        #info div, #geo div {
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
+    <div id="map"></div>
     <div id="info">
         <div id="sup_id"></div>
         <div id="sta_nm_anfr"></div>
@@ -55,7 +56,7 @@
         <div id="distance"></div>
         <div id="azimuth"></div>
     </div>
-    <div id="map"></div>
+
     <!-- Script Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
@@ -151,7 +152,7 @@
             const distance = calculateDistance(userLat, userLon, selectedStation.Latitude, selectedStation.Longitude);
             const azimuth = calculateAzimuth(selectedStation.Latitude, selectedStation.Longitude, userLat, userLon);
 
-            // Afficher les informations en haut de la page
+            // Afficher les informations
             document.getElementById('sup_id').textContent = `SUP_ID: ${selectedStation.SUP_ID}`;
             document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${selectedStation.STA_NM_ANFR}`;
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
