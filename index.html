@@ -74,10 +74,13 @@
 
         // Fonction pour afficher les supports sur la carte
         function displaySupports(userLat, userLon, supports) {
-            // Ajouter un marqueur pour la position de l'utilisateur
-            L.marker([userLat, userLon]).addTo(map)
-                .bindPopup("Votre position")
-                .openPopup();
+            // Ajouter un cercle pour la position de l'utilisateur
+            L.circle([userLat, userLon], {
+                color: 'blue',
+                fillColor: 'blue',
+                fillOpacity: 1,
+                radius: 10
+            }).addTo(map).bindPopup("Votre position");
 
             // Ajouter des marqueurs pour les supports proches
             supports.forEach(support => {
