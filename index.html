@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet centrée sur le segment</title>
+    <title>Carte Leaflet avec zoom dynamique</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -132,11 +132,13 @@
             updateSelectedStationInfo();
         }
 
-        // Fonction pour centrer la carte sur le milieu du segment
-        function centerOnSegmentMidpoint(lat1, lon1, lat2, lon2) {
-            const midLat = (lat1 + lat2) / 2;
-            const midLon = (lon1 + lon2) / 2;
-            map.setView([midLat, midLon], 16);
+        // Fonction pour centrer et zoomer sur le segment
+        function fitToSegment(lat1, lon1, lat2, lon2) {
+            const bounds = [
+                [lat1, lon1],
+                [lat2, lon2]
+            ];
+            map.fitBounds(bounds, { padding: [50, 50] });
         }
 
         // Fonction pour mettre à jour les infos de la station sélectionnée
@@ -164,8 +166,8 @@
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
 
-            // Centrer la carte sur le milieu du segment
-            centerOnSegmentMidpoint(userLat, userLon, selectedStation.Latitude, selectedStation.Longitude);
+            // Ajuster la vue pour inclure le segment
+            fitToSegment(userLat, userLon, selectedStation.Latitude, selectedStation.Longitude);
         }
 
         // Fonction pour mettre à jour la position de l'utilisateur
@@ -225,4 +227,3 @@
     </script>
 </body>
 </html>
-
