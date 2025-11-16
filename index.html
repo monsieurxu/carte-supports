@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec superposition</title>
+    <title>Carte Leaflet avec infos superposées</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -21,38 +21,38 @@
             width: 100%;
             position: relative;
         }
-        #info, #geo {
+        .info-panel {
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
             background: rgba(255, 255, 255, 0.8);
             padding: 10px;
-            font-size: 20px;
+            font-size: 16px;
             font-weight: bold;
-            text-align: center;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
             z-index: 1000;
-            border-bottom: 1px solid #ccc;
+            max-width: 300px;
         }
         #info {
-            height: 10vh;
+            top: 10px;
+            left: 10px;
         }
         #geo {
-            top: 10vh;
-            height: 10vh;
+            bottom: 10px;
+            left: 10px;
         }
-        #info div, #geo div {
+        .info-panel div {
             margin: 5px 0;
+            padding: 2px 5px;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <div id="info">
+    <div id="info" class="info-panel">
         <div id="sup_id"></div>
         <div id="sta_nm_anfr"></div>
     </div>
-    <div id="geo">
+    <div id="geo" class="info-panel">
         <div id="distance"></div>
         <div id="azimuth"></div>
     </div>
