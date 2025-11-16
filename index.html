@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec supports proches</title>
+    <title>Carte Leaflet avec supports proches et azimuth</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -50,12 +50,23 @@
             return R * c;
         }
 
+        // Fonction pour calculer l'azimuth entre deux points (en degrés)
+        function calculateAzimuth(lat1, lon1, lat2, lon2) {
+            const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) -
+                      Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+            let azimuth = Math.atan2(y, x) * 180 / Math.PI;
+            azimuth = (azimuth + 360) % 360; // Normaliser entre 0 et 360
+            return azimuth.toFixed(1);
+        }
+
         // Fonction pour trouver les 10 supports les plus proches
         function findNearestSupports(userLat, userLon, supports, count = 10) {
             return supports
                 .map(support => ({
                     ...support,
-                    distance: calculateDistance(userLat, userLon, support.Latitude, support.Longitude)
+                    distance: calculateDistance(userLat, userLon, support.Latitude, support.Longitude),
+                    azimuth: calculateAzimuth(support.Latitude, support.Longitude, userLat, userLon)
                 }))
                 .sort((a, b) => a.distance - b.distance)
                 .slice(0, count);
@@ -71,7 +82,11 @@
             // Ajouter des marqueurs pour les supports proches
             supports.forEach(support => {
                 L.marker([support.Latitude, support.Longitude]).addTo(map)
-                    .bindPopup(`Support: ${support.STA_NM_ANFR}<br>Distance: ${support.distance.toFixed(2)} km`);
+                    .bindPopup(
+                        `Support: ${support.STA_NM_ANFR}<br>
+                         Distance: ${support.distance.toFixed(2)} km<br>
+                         Azimuth vers vous: ${support.azimuth}°`
+                    );
             });
         }
 
