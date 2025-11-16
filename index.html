@@ -3,66 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte des Supports Proches</title>
+    <title>Ma Localisation sur Carte</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
-        #map { height: 500px; margin-bottom: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        button, select { padding: 8px 16px; margin: 10px 0; cursor: pointer; }
-        #status { margin: 10px 0; color: #666; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #map {
+            height: 500px;
+            margin-top: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #status {
+            margin: 10px 0;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <h1>Carte des Supports Proches</h1>
+    <h1>Ma Localisation sur Carte</h1>
     <button id="locateMe">Me localiser</button>
-    <div id="status">Localisez-vous pour voir les supports à proximité.</div>
-    <select id="staSelect" disabled>
-        <option value="">-- Sélectionnez un STA_NM_ANFR proche --</option>
-    </select>
+    <div id="status"></div>
     <div id="map"></div>
-    <div id="result"></div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <!-- PapaParse pour parser le CSV -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script>
         // Initialiser la carte centrée sur la France
         const map = L.map('map').setView([46.0, 2.0], 6);
+
+        // Ajouter la couche OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Variables globales
-        let allData = [];
-        let markers = [];
-        let userMarker = null;
-        let userPosition = null;
-        let nearbyMarkers = [];
+        // Bouton de localisation
+        document.getElementById('locateMe').addEventListener('click', function() {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = "Localisation en cours...";
 
-        // Charger le fichier CSV automatiquement
-        Papa.parse('SUP_SUPPORT.txt', {
-            delimiter: ";",
-            encoding: "Windows-1252",
-            header: true,
-            download: true,
-            complete: function(results) {
-                allData = results.data;
-            },
-            error: function(error) {
-                document.getElementById('status').textContent = "Erreur lors du chargement des données.";
-                console.error("Erreur lors de la lecture du fichier :", error);
+            if (!navigator.geolocation) {
+                statusElement.textContent = "La géolocalisation n'est pas supportée par votre navigateur.";
+                return;
             }
-        });
 
-        // Calculer la distance entre deux points en km
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Rayon de la Terre en km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    statusElement.textContent = "Localisation réussie !";
+
+                    // Ajouter un marqueur à votre position
+                    L.marker([lat, lon]).addTo(map)
+                        .bindPopup("<b>Vous êtes ici</b>")
+                        .openPopup();
+
+                    // Centrer la carte sur votre position
+                    map.setView([lat, lon], 15);
+                },
+                function(error) {
+                    let errorMessage = "Impossible de vous localiser : ";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage += "Vous avez refusé la demande de géolocalisation.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage += "Les informations de localisation ne sont pas disponibles.";
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage += "La demande de localisation a expiré.";
+                            break;
+                        case error.UNKNOWN_ERROR:
+                            errorMessage += "Une erreur inconnue est survenue.";
+                            break;
+                    }
+                    statusElement.textContent = errorMessage;
+                    console.error("Erreur de géolocalisation :", error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
+        });
+    </script>
+</body>
+</html>
             const a =
                 Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
