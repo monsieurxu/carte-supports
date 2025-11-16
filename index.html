@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec supports proches</title>
+    <title>Carte Leaflet avec rafraîchissement automatique</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -59,6 +59,9 @@
         // Variables globales
         let userLat, userLon;
         let selectedLine = null;
+        let selectedSupport = null;
+        let userCircle = null;
+        let supportsMarkers = [];
 
         // Fonction pour calculer la distance entre deux points en km
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -82,6 +85,11 @@
             return azimuth.toFixed(1);
         }
 
+        // Fonction pour mettre à jour la position de l'utilisateur et recalculer les infos
+        function updateUserPosition() {
+            map.locate({ setView: true, maxZoom: 16 });
+        }
+
         // Fonction pour trouver les 10 supports les plus proches
         function findNearestSupports(supports, count = 10) {
             return supports
@@ -99,11 +107,20 @@
             supports.forEach(support => {
                 const marker = L.marker([support.Latitude, support.Longitude]).addTo(map);
                 marker.on('click', () => onSupportSelected(support));
+                supportsMarkers.push(marker);
             });
         }
 
         // Fonction appelée quand un support est sélectionné
         function onSupportSelected(support) {
+            selectedSupport = support;
+            updateSelectedSupportInfo();
+        }
+
+        // Fonction pour mettre à jour les infos du support sélectionné
+        function updateSelectedSupportInfo() {
+            if (!selectedSupport || !userLat || !userLon) return;
+
             // Effacer l'ancienne ligne
             if (selectedLine) {
                 map.removeLayer(selectedLine);
@@ -112,14 +129,44 @@
             // Tracer une ligne entre le support et l'utilisateur
             selectedLine = L.polyline([
                 [userLat, userLon],
-                [support.Latitude, support.Longitude]
+                [selectedSupport.Latitude, selectedSupport.Longitude]
             ], {color: 'red'}).addTo(map);
 
+            // Recalculer distance et azimuth
+            const distance = calculateDistance(userLat, userLon, selectedSupport.Latitude, selectedSupport.Longitude);
+            const azimuth = calculateAzimuth(selectedSupport.Latitude, selectedSupport.Longitude, userLat, userLon);
+
             // Afficher les informations en haut de la page
-            document.getElementById('sup_id').textContent = `SUP_ID: ${support.SUP_ID}`;
-            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${support.STA_NM_ANFR}`;
-            document.getElementById('distance').textContent = `Distance: ${support.distance.toFixed(2)} km`;
-            document.getElementById('azimuth').textContent = `Azimuth: ${support.azimuth}°`;
+            document.getElementById('sup_id').textContent = `SUP_ID: ${selectedSupport.SUP_ID}`;
+            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${selectedSupport.STA_NM_ANFR}`;
+            document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
+            document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
+        }
+
+        // Géolocalisation de l'utilisateur
+        function onLocationFound(e) {
+            userLat = e.latlng.lat;
+            userLon = e.latlng.lng;
+
+            // Mettre à jour le cercle de l'utilisateur
+            if (userCircle) {
+                map.removeLayer(userCircle);
+            }
+            userCircle = L.circle([userLat, userLon], {
+                color: 'blue',
+                fillColor: 'blue',
+                fillOpacity: 1,
+                radius: 10
+            }).addTo(map);
+
+            // Mettre à jour les infos si un support est sélectionné
+            if (selectedSupport) {
+                updateSelectedSupportInfo();
+            }
+        }
+
+        function onLocationError(e) {
+            alert("Impossible de récupérer votre position : " + e.message);
         }
 
         // Charger le fichier CSV
@@ -128,34 +175,17 @@
             header: true,
             complete: function(results) {
                 const supports = results.data;
+                const nearestSupports = findNearestSupports(supports);
+                displaySupports(nearestSupports);
 
-                // Géolocalisation de l'utilisateur
-                function onLocationFound(e) {
-                    userLat = e.latlng.lat;
-                    userLon = e.latlng.lng;
-                    map.setView([userLat, userLon], 15);
-
-                    // Ajouter un cercle pour la position de l'utilisateur
-                    L.circle([userLat, userLon], {
-                        color: 'blue',
-                        fillColor: 'blue',
-                        fillOpacity: 1,
-                        radius: 10
-                    }).addTo(map);
-
-                    const nearestSupports = findNearestSupports(supports);
-                    displaySupports(nearestSupports);
-                }
-
-                function onLocationError(e) {
-                    alert("Impossible de récupérer votre position : " + e.message);
-                }
-
-                map.on('locationfound', onLocationFound);
-                map.on('locationerror', onLocationError);
-                map.locate({ setView: true, maxZoom: 16 });
+                // Rafraîchir la position toutes les 10 secondes
+                setInterval(updateUserPosition, 10000);
             }
         });
+
+        map.on('locationfound', onLocationFound);
+        map.on('locationerror', onLocationError);
+        map.locate({ setView: true, maxZoom: 16 });
     </script>
 </body>
 </html>
