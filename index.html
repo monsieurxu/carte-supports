@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec rafraîchissement automatique</title>
+    <title>Carte Leaflet avec centrage automatique</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -87,12 +87,12 @@
         }
 
         // Fonction pour trouver les 10 supports les plus proches
-        function findNearestSupports(supports, userLat, userLon, count = 10) {
+        function findNearestSupports(supports, lat, lon, count = 10) {
             return supports
                 .map(support => ({
                     ...support,
-                    distance: calculateDistance(userLat, userLon, support.Latitude, support.Longitude),
-                    azimuth: calculateAzimuth(support.Latitude, support.Longitude, userLat, userLon)
+                    distance: calculateDistance(lat, lon, support.Latitude, support.Longitude),
+                    azimuth: calculateAzimuth(support.Latitude, support.Longitude, lat, lon)
                 }))
                 .sort((a, b) => a.distance - b.distance)
                 .slice(0, count);
@@ -111,6 +111,14 @@
         function onSupportSelected(support) {
             selectedSupport = support;
             updateSelectedSupportInfo();
+            // Centrer la carte sur l'utilisateur et le support sélectionné
+            if (userLat && userLon) {
+                const group = L.featureGroup([
+                    L.latLng(userLat, userLon),
+                    L.latLng(support.Latitude, support.Longitude)
+                ]);
+                map.fitBounds(group.getBounds().pad(0.5));
+            }
         }
 
         // Fonction pour mettre à jour les infos du support sélectionné
@@ -137,11 +145,18 @@
             document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${selectedSupport.STA_NM_ANFR}`;
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
+
+            // Centrer la carte sur l'utilisateur et le support sélectionné
+            const group = L.featureGroup([
+                L.latLng(userLat, userLon),
+                L.latLng(selectedSupport.Latitude, selectedSupport.Longitude)
+            ]);
+            map.fitBounds(group.getBounds().pad(0.5));
         }
 
         // Fonction pour mettre à jour la position de l'utilisateur
         function updateUserPosition() {
-            map.locate({ setView: true, maxZoom: 16 });
+            map.locate({ setView: false });
         }
 
         // Géolocalisation de l'utilisateur
