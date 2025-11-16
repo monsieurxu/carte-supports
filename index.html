@@ -50,8 +50,12 @@
     <!-- Script Papa Parse pour lire le CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script>
+        // Position de départ
+        const defaultLat = 47.3513162;
+        const defaultLon = -2.0982229;
+
         // Initialisation de la carte
-        const map = L.map('map').setView([48.8566, 2.3522], 13);
+        const map = L.map('map').setView([defaultLat, defaultLon], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -100,6 +104,8 @@
 
         // Fonction pour afficher les stations sur la carte
         function displayStations(stations) {
+            stationsMarkers.forEach(marker => map.removeLayer(marker));
+            stationsMarkers = [];
             stations.forEach(station => {
                 const marker = L.marker([station.Latitude, station.Longitude]).addTo(map);
                 marker.on('click', () => onStationSelected(station));
@@ -148,7 +154,7 @@
 
         // Fonction pour mettre à jour la position de l'utilisateur
         function updateUserPosition() {
-            map.locate({setView: true});
+            map.locate({setView: true, maxZoom: 16});
         }
 
         // Géolocalisation de l'utilisateur
@@ -167,6 +173,10 @@
                 radius: 10
             }).addTo(map);
 
+            // Afficher les 10 stations les plus proches
+            const nearestStations = findNearestStations(stations, userLat, userLon);
+            displayStations(nearestStations);
+
             // Mettre à jour les infos si une station est sélectionnée
             if (selectedStation) {
                 updateSelectedStationInfo();
@@ -183,21 +193,19 @@
             header: true,
             complete: function(results) {
                 stations = results.data;
-                // Calculer les 10 stations les plus proches une seule fois
-                map.locate();
+                // Afficher les 10 stations les plus proches de la position par défaut
+                const nearestStations = findNearestStations(stations, defaultLat, defaultLon);
+                displayStations(nearestStations);
             }
         });
 
-        map.on('locationfound', function(e) {
-            userLat = e.latlng.lat;
-            userLon = e.latlng.lng;
-            const nearestStations = findNearestStations(stations, userLat, userLon);
-            displayStations(nearestStations);
-            // Rafraîchir la position toutes les 10 secondes
-            setInterval(updateUserPosition, 10000);
-        });
-
+        // Demander la localisation de l'utilisateur
+        map.on('locationfound', onLocationFound);
         map.on('locationerror', onLocationError);
+        map.locate({setView: true, maxZoom: 16});
+
+        // Rafraîchir la position toutes les 10 secondes
+        setInterval(updateUserPosition, 10000);
     </script>
 </body>
 </html>
