@@ -61,6 +61,7 @@
         let selectedLine = null;
         let selectedSupport = null;
         let userCircle = null;
+        let nearestSupports = [];
         let supportsMarkers = [];
 
         // Fonction pour calculer la distance entre deux points en km
@@ -85,13 +86,8 @@
             return azimuth.toFixed(1);
         }
 
-        // Fonction pour mettre à jour la position de l'utilisateur et recalculer les infos
-        function updateUserPosition() {
-            map.locate({ setView: true, maxZoom: 16 });
-        }
-
         // Fonction pour trouver les 10 supports les plus proches
-        function findNearestSupports(supports, count = 10) {
+        function findNearestSupports(supports, userLat, userLon, count = 10) {
             return supports
                 .map(support => ({
                     ...support,
@@ -143,6 +139,11 @@
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
         }
 
+        // Fonction pour mettre à jour la position de l'utilisateur
+        function updateUserPosition() {
+            map.locate({ setView: true, maxZoom: 16 });
+        }
+
         // Géolocalisation de l'utilisateur
         function onLocationFound(e) {
             userLat = e.latlng.lat;
@@ -175,17 +176,21 @@
             header: true,
             complete: function(results) {
                 const supports = results.data;
-                const nearestSupports = findNearestSupports(supports);
-                displaySupports(nearestSupports);
-
-                // Rafraîchir la position toutes les 10 secondes
-                setInterval(updateUserPosition, 10000);
+                // Calculer les 10 supports les plus proches une seule fois
+                map.locate();
+                map.on('locationfound', function(e) {
+                    userLat = e.latlng.lat;
+                    userLon = e.latlng.lng;
+                    nearestSupports = findNearestSupports(supports, userLat, userLon);
+                    displaySupports(nearestSupports);
+                    // Rafraîchir la position toutes les 10 secondes
+                    setInterval(updateUserPosition, 10000);
+                });
             }
         });
 
         map.on('locationfound', onLocationFound);
         map.on('locationerror', onLocationError);
-        map.locate({ setView: true, maxZoom: 16 });
     </script>
 </body>
 </html>
