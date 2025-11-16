@@ -12,11 +12,13 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         button, select { padding: 8px 16px; margin: 10px 0; cursor: pointer; }
+        #status { margin: 10px 0; color: #666; }
     </style>
 </head>
 <body>
     <h1>Carte des Supports</h1>
     <button id="locateMe">Me localiser</button>
+    <div id="status"></div>
     <select id="staSelect">
         <option value="">-- Sélectionnez un STA_NM_ANFR --</option>
     </select>
@@ -37,8 +39,9 @@
         // Variables globales
         let allData = [];
         let markers = [];
+        let userMarker = null;
 
-        // Charger le fichier CSV depuis GitHub Pages
+        // Charger le fichier CSV automatiquement
         Papa.parse('SUP_SUPPORT.txt', {
             delimiter: ";",
             encoding: "Windows-1252",
@@ -49,6 +52,7 @@
                 populateStaSelect();
             },
             error: function(error) {
+                document.getElementById('status').textContent = "Erreur lors du chargement des données.";
                 console.error("Erreur lors de la lecture du fichier :", error);
             }
         });
@@ -142,23 +146,56 @@
 
         // Bouton de localisation
         document.getElementById('locateMe').addEventListener('click', function() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        L.marker([lat, lon]).addTo(map)
-                            .bindPopup("<b>Vous êtes ici</b>")
-                            .openPopup();
-                        map.setView([lat, lon], 13);
-                    },
-                    function(error) {
-                        alert("Impossible de vous localiser : " + error.message);
-                    }
-                );
-            } else {
-                alert("La géolocalisation n'est pas supportée par votre navigateur.");
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = "Localisation en cours...";
+
+            if (!navigator.geolocation) {
+                statusElement.textContent = "La géolocalisation n'est pas supportée par votre navigateur.";
+                return;
             }
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    statusElement.textContent = "Localisation réussie !";
+
+                    // Supprimer l'ancien marqueur de l'utilisateur s'il existe
+                    if (userMarker) {
+                        map.removeLayer(userMarker);
+                    }
+
+                    // Ajouter un nouveau marqueur pour l'utilisateur
+                    userMarker = L.marker([lat, lon]).addTo(map)
+                        .bindPopup("<b>Vous êtes ici</b>")
+                        .openPopup();
+                    map.setView([lat, lon], 13);
+                },
+                function(error) {
+                    let errorMessage = "Impossible de vous localiser : ";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage += "Vous avez refusé la demande de géolocalisation.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage += "Les informations de localisation ne sont pas disponibles.";
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage += "La demande de localisation a expiré.";
+                            break;
+                        case error.UNKNOWN_ERROR:
+                            errorMessage += "Une erreur inconnue est survenue.";
+                            break;
+                    }
+                    statusElement.textContent = errorMessage;
+                    console.error("Erreur de géolocalisation :", error);
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
         });
     </script>
 </body>
