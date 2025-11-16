@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte des Supports avec Localisation et Filtre</title>
+    <title>Carte des Supports Proches</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <style>
@@ -16,11 +16,11 @@
     </style>
 </head>
 <body>
-    <h1>Carte des Supports</h1>
+    <h1>Carte des Supports Proches</h1>
     <button id="locateMe">Me localiser</button>
-    <div id="status"></div>
-    <select id="staSelect">
-        <option value="">-- Sélectionnez un STA_NM_ANFR --</option>
+    <div id="status">Localisez-vous pour voir les supports à proximité.</div>
+    <select id="staSelect" disabled>
+        <option value="">-- Sélectionnez un STA_NM_ANFR proche --</option>
     </select>
     <div id="map"></div>
     <div id="result"></div>
@@ -40,6 +40,8 @@
         let allData = [];
         let markers = [];
         let userMarker = null;
+        let userPosition = null;
+        let nearbyMarkers = [];
 
         // Charger le fichier CSV automatiquement
         Papa.parse('SUP_SUPPORT.txt', {
@@ -49,7 +51,6 @@
             download: true,
             complete: function(results) {
                 allData = results.data;
-                populateStaSelect();
             },
             error: function(error) {
                 document.getElementById('status').textContent = "Erreur lors du chargement des données.";
@@ -57,22 +58,68 @@
             }
         });
 
-        // Remplir le menu déroulant avec les STA_NM_ANFR uniques
-        function populateStaSelect() {
-            const staSelect = document.getElementById('staSelect');
-            const uniqueSta = [...new Set(allData.map(item => item.STA_NM_ANFR))];
+        // Calculer la distance entre deux points en km
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Rayon de la Terre en km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
 
-            uniqueSta.forEach(sta => {
+        // Remplir le menu déroulant avec les 5 STA_NM_ANFR les plus proches
+        function populateNearbyStaSelect() {
+            const staSelect = document.getElementById('staSelect');
+            staSelect.innerHTML = '<option value="">-- Sélectionnez un STA_NM_ANFR proche --</option>';
+
+            if (!userPosition) return;
+
+            // Calculer la distance pour chaque support
+            const dataWithDistance = allData.map(row => {
+                const lat = parseFloat(row.COR_NB_DG_LAT) + parseFloat(row.COR_NB_MN_LAT)/60 + parseFloat(row.COR_NB_SC_LAT)/3600;
+                const latitude = row.COR_CD_NS_LAT === 'S' ? -lat : lat;
+
+                const lon = parseFloat(row.COR_NB_DG_LON) + parseFloat(row.COR_NB_MN_LON)/60 + parseFloat(row.COR_NB_SC_LON)/3600;
+                const longitude = row.COR_CD_EW_LON === 'W' ? -lon : lon;
+
+                const distance = calculateDistance(userPosition.lat, userPosition.lon, latitude, longitude);
+                return { ...row, latitude, longitude, distance };
+            });
+
+            // Trier par distance et prendre les 5 plus proches
+            const nearbySta = [...new Map(
+                dataWithDistance
+                    .sort((a, b) => a.distance - b.distance)
+                    .slice(0, 5)
+                    .map(item => [item.STA_NM_ANFR, item])
+            )].map(([sta, data]) => data);
+
+            // Ajouter les marqueurs des 5 supports les plus proches
+            nearbySta.forEach(data => {
+                const marker = L.marker([data.latitude, data.longitude]).addTo(map)
+                    .bindPopup(`<b>ID:</b> ${data.SUP_ID}<br><b>Nom:</b> ${data.STA_NM_ANFR}<br><b>Distance:</b> ${data.distance.toFixed(2)} km`);
+                nearbyMarkers.push(marker);
+
                 const option = document.createElement('option');
-                option.value = sta;
-                option.textContent = sta;
+                option.value = data.STA_NM_ANFR;
+                option.textContent = `${data.STA_NM_ANFR} (${data.distance.toFixed(2)} km)`;
                 staSelect.appendChild(option);
             });
+
+            staSelect.disabled = false;
+
+            // Ajuster la vue de la carte pour inclure votre position et les 5 supports
+            const allMarkers = [userMarker, ...nearbyMarkers];
+            const group = new L.featureGroup(allMarkers);
+            map.fitBounds(group.getBounds());
 
             // Écouter le changement de sélection
             staSelect.addEventListener('change', function() {
                 const selectedSta = this.value;
-                clearMarkers();
                 if (selectedSta) {
                     displaySelectedSta(selectedSta);
                 }
@@ -87,6 +134,7 @@
 
         // Afficher les supports pour le STA_NM_ANFR sélectionné
         function displaySelectedSta(selectedSta) {
+            clearMarkers();
             const filteredData = allData.filter(row => row.STA_NM_ANFR === selectedSta);
             const tableData = [];
 
@@ -108,12 +156,6 @@
                     Longitude: longitude.toFixed(6)
                 });
             });
-
-            // Ajuster la vue de la carte
-            if (markers.length > 0) {
-                const group = new L.featureGroup(markers);
-                map.fitBounds(group.getBounds());
-            }
 
             // Afficher les données dans un tableau
             let tableHTML = `
@@ -156,9 +198,10 @@
 
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    statusElement.textContent = "Localisation réussie !";
+                    userPosition = {
+                        lat: position.coords.latitude,
+                        lon: position.coords.longitude
+                    };
 
                     // Supprimer l'ancien marqueur de l'utilisateur s'il existe
                     if (userMarker) {
@@ -166,10 +209,12 @@
                     }
 
                     // Ajouter un nouveau marqueur pour l'utilisateur
-                    userMarker = L.marker([lat, lon]).addTo(map)
-                        .bindPopup("<b>Vous êtes ici</b>")
-                        .openPopup();
-                    map.setView([lat, lon], 13);
+                    userMarker = L.marker([userPosition.lat, userPosition.lon]).addTo(map)
+                        .bindPopup("<b>Vous êtes ici</b>");
+
+                    // Remplir le menu déroulant avec les 5 STA_NM_ANFR les plus proches
+                    populateNearbyStaSelect();
+                    statusElement.textContent = "Localisation réussie ! Voici les 5 supports les plus proches :";
                 },
                 function(error) {
                     let errorMessage = "Impossible de vous localiser : ";
