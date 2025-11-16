@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec centrage automatique</title>
+    <title>Carte Leaflet avec supports et stations</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -59,10 +59,10 @@
         // Variables globales
         let userLat, userLon;
         let selectedLine = null;
-        let selectedSupport = null;
+        let selectedStation = null;
         let userCircle = null;
-        let nearestSupports = [];
-        let supportsMarkers = [];
+        let stationsMarkers = [];
+        let stations = [];
 
         // Fonction pour calculer la distance entre deux points en km
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -86,70 +86,70 @@
             return azimuth.toFixed(1);
         }
 
-        // Fonction pour trouver les 10 supports les plus proches
-        function findNearestSupports(supports, lat, lon, count = 10) {
-            return supports
-                .map(support => ({
-                    ...support,
-                    distance: calculateDistance(lat, lon, support.Latitude, support.Longitude),
-                    azimuth: calculateAzimuth(support.Latitude, support.Longitude, lat, lon)
+        // Fonction pour trouver les 10 stations les plus proches
+        function findNearestStations(stations, lat, lon, count = 10) {
+            return stations
+                .map(station => ({
+                    ...station,
+                    distance: calculateDistance(lat, lon, station.Latitude, station.Longitude),
+                    azimuth: calculateAzimuth(station.Latitude, station.Longitude, lat, lon)
                 }))
                 .sort((a, b) => a.distance - b.distance)
                 .slice(0, count);
         }
 
-        // Fonction pour afficher les supports sur la carte
-        function displaySupports(supports) {
-            supports.forEach(support => {
-                const marker = L.marker([support.Latitude, support.Longitude]).addTo(map);
-                marker.on('click', () => onSupportSelected(support));
-                supportsMarkers.push(marker);
+        // Fonction pour afficher les stations sur la carte
+        function displayStations(stations) {
+            stations.forEach(station => {
+                const marker = L.marker([station.Latitude, station.Longitude]).addTo(map);
+                marker.on('click', () => onStationSelected(station));
+                stationsMarkers.push(marker);
             });
         }
 
-        // Fonction appelée quand un support est sélectionné
-        function onSupportSelected(support) {
-            selectedSupport = support;
-            updateSelectedSupportInfo();
-            // Centrer la carte sur l'utilisateur et le support sélectionné
+        // Fonction appelée quand une station est sélectionnée
+        function onStationSelected(station) {
+            selectedStation = station;
+            updateSelectedStationInfo();
+            // Centrer la carte sur l'utilisateur et la station sélectionnée
             if (userLat && userLon) {
                 const group = L.featureGroup([
                     L.latLng(userLat, userLon),
-                    L.latLng(support.Latitude, support.Longitude)
+                    L.latLng(station.Latitude, station.Longitude)
                 ]);
                 map.fitBounds(group.getBounds().pad(0.5));
             }
         }
 
-        // Fonction pour mettre à jour les infos du support sélectionné
-        function updateSelectedSupportInfo() {
-            if (!selectedSupport || !userLat || !userLon) return;
+        // Fonction pour mettre à jour les infos de la station sélectionnée
+        function updateSelectedStationInfo() {
+            if (!selectedStation || !userLat || !userLon) return;
 
             // Effacer l'ancienne ligne
             if (selectedLine) {
                 map.removeLayer(selectedLine);
             }
 
-            // Tracer une ligne entre le support et l'utilisateur
+            // Tracer une ligne entre la station et l'utilisateur
             selectedLine = L.polyline([
                 [userLat, userLon],
-                [selectedSupport.Latitude, selectedSupport.Longitude]
+                [selectedStation.Latitude, selectedStation.Longitude]
             ], {color: 'red'}).addTo(map);
 
             // Recalculer distance et azimuth
-            const distance = calculateDistance(userLat, userLon, selectedSupport.Latitude, selectedSupport.Longitude);
-            const azimuth = calculateAzimuth(selectedSupport.Latitude, selectedSupport.Longitude, userLat, userLon);
+            const distance = calculateDistance(userLat, userLon, selectedStation.Latitude, selectedStation.Longitude);
+            const azimuth = calculateAzimuth(selectedStation.Latitude, selectedStation.Longitude, userLat, userLon);
 
             // Afficher les informations en haut de la page
-            document.getElementById('sup_id').textContent = `SUP_ID: ${selectedSupport.SUP_ID}`;
-            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${selectedSupport.STA_NM_ANFR}`;
+            document.getElementById('sup_id').textContent = `SUP_ID: ${selectedStation.SUP_ID}`;
+            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${selectedStation.STA_NM_ANFR}`;
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
 
-            // Centrer la carte sur l'utilisateur et le support sélectionné
+            // Centrer la carte sur l'utilisateur et la station sélectionnée
             const group = L.featureGroup([
                 L.latLng(userLat, userLon),
-                L.latLng(selectedSupport.Latitude, selectedSupport.Longitude)
+                L.latLng(selectedStation.Latitude, selectedStation.Longitude)
             ]);
             map.fitBounds(group.getBounds().pad(0.5));
         }
@@ -175,9 +175,9 @@
                 radius: 10
             }).addTo(map);
 
-            // Mettre à jour les infos si un support est sélectionné
-            if (selectedSupport) {
-                updateSelectedSupportInfo();
+            // Mettre à jour les infos si une station est sélectionnée
+            if (selectedStation) {
+                updateSelectedStationInfo();
             }
         }
 
@@ -190,14 +190,14 @@
             download: true,
             header: true,
             complete: function(results) {
-                const supports = results.data;
-                // Calculer les 10 supports les plus proches une seule fois
+                stations = results.data;
+                // Calculer les 10 stations les plus proches une seule fois
                 map.locate();
                 map.on('locationfound', function(e) {
                     userLat = e.latlng.lat;
                     userLon = e.latlng.lng;
-                    nearestSupports = findNearestSupports(supports, userLat, userLon);
-                    displaySupports(nearestSupports);
+                    const nearestStations = findNearestStations(stations, userLat, userLon);
+                    displayStations(nearestStations);
                     // Rafraîchir la position toutes les 10 secondes
                     setInterval(updateUserPosition, 10000);
                 });
