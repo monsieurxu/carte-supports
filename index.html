@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet Pleine Page</title>
-    <!-- Feuille de style de Leaflet -->
+    <title>Carte Leaflet avec supports proches</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -25,44 +24,82 @@
 <body>
     <div id="map"></div>
 
-    <!-- Script Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
     <script>
-        // Initialisation de la carte
-        var map = L.map('map').setView([48.8566, 2.3522], 13);
+        // Données des supports (exemple avec quelques entrées pour démonstration)
+        const supports = [
+            { STA_NM_ANFR: "0162290002", Latitude: 46.003611, Longitude: 0.355278 },
+            { STA_NM_ANFR: "0160230003", Latitude: 45.695278, Longitude: -0.349167 },
+            { STA_NM_ANFR: "0160230004", Latitude: 45.637222, Longitude: 0.130833 },
+            { STA_NM_ANFR: "0160230014", Latitude: 45.741667, Longitude: 0.268056 },
+            { STA_NM_ANFR: "0160230017", Latitude: 45.278611, Longitude: 0.099722 },
+            // Ajoutez ici toutes les autres entrées de votre fichier CSV
+        ];
 
-        // Ajout de la couche OpenStreetMap
+        // Initialisation de la carte
+        const map = L.map('map').setView([48.8566, 2.3522], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
-        // Fonction pour obtenir la localisation de l'utilisateur
-        function onLocationFound(e) {
-            var radius = e.accuracy / 2;
+        // Fonction pour calculer la distance entre deux points en km
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Rayon de la Terre en km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
 
-            // Centrer la carte sur la position de l'utilisateur
-            map.setView(e.latlng, 15);
+        // Fonction pour trouver les 10 supports les plus proches
+        function findNearestSupports(userLat, userLon, supports, count = 10) {
+            return supports
+                .map(support => ({
+                    ...support,
+                    distance: calculateDistance(userLat, userLon, support.Latitude, support.Longitude)
+                }))
+                .sort((a, b) => a.distance - b.distance)
+                .slice(0, count);
+        }
 
-            // Ajouter un marqueur à la position de l'utilisateur
-            L.marker(e.latlng).addTo(map)
-                .bindPopup("Vous êtes ici (précision : " + radius + " mètres)")
+        // Fonction pour afficher les supports sur la carte
+        function displaySupports(userLat, userLon, supports) {
+            // Ajouter un marqueur pour la position de l'utilisateur
+            L.marker([userLat, userLon]).addTo(map)
+                .bindPopup("Votre position")
                 .openPopup();
 
-            // Ajouter un cercle pour indiquer la précision
-            L.circle(e.latlng, radius).addTo(map);
+            // Ajouter des marqueurs pour les supports proches
+            supports.forEach(support => {
+                L.marker([support.Latitude, support.Longitude]).addTo(map)
+                    .bindPopup(`Support: ${support.STA_NM_ANFR}<br>Distance: ${support.distance.toFixed(2)} km`);
+            });
         }
 
-        // Gestion des erreurs de géolocalisation
+        // Géolocalisation de l'utilisateur
+        function onLocationFound(e) {
+            const userLat = e.latlng.lat;
+            const userLon = e.latlng.lng;
+            map.setView([userLat, userLon], 15);
+
+            const nearestSupports = findNearestSupports(userLat, userLon, supports);
+            displaySupports(userLat, userLon, nearestSupports);
+        }
+
         function onLocationError(e) {
-            alert(e.message);
+            alert("Impossible de récupérer votre position : " + e.message);
         }
 
-        // Demander la localisation de l'utilisateur
         map.on('locationfound', onLocationFound);
         map.on('locationerror', onLocationError);
-        map.locate({setView: true, maxZoom: 16});
+        map.locate({ setView: true, maxZoom: 16 });
     </script>
 </body>
 </html>
+
