@@ -3,17 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ma Carte Leaflet</title>
+    <title>Carte Leaflet Pleine Page</title>
     <!-- Feuille de style de Leaflet -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
     <style>
-        #map { height: 500px; }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
     </style>
 </head>
 <body>
-    <h1>Ma Localisation sur une Carte</h1>
     <div id="map"></div>
 
     <!-- Script Leaflet -->
@@ -21,18 +30,13 @@
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
     <script>
-        // Initialisation de la carte centrée sur Paris par défaut
+        // Initialisation de la carte
         var map = L.map('map').setView([48.8566, 2.3522], 13);
 
         // Ajout de la couche OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
-
-        // Ajout d'un marqueur à la position par défaut
-        var marker = L.marker([48.8566, 2.3522]).addTo(map)
-            .bindPopup('Ma position par défaut')
-            .openPopup();
 
         // Fonction pour obtenir la localisation de l'utilisateur
         function onLocationFound(e) {
