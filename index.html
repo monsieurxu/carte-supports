@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carte des Supports avec Localisation et Filtre</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        #map { height: 500px; margin-bottom: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        button, select { padding: 8px 16px; margin: 10px 0; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Carte des Supports</h1>
+    <button id="locateMe">Me localiser</button>
+    <select id="staSelect">
+        <option value="">-- Sélectionnez un STA_NM_ANFR --</option>
+    </select>
+    <div id="map"></div>
+    <div id="result"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- PapaParse pour parser le CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <script>
+        // Initialiser la carte centrée sur la France
+        const map = L.map('map').setView([46.0, 2.0], 6);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Variables globales
+        let allData = [];
+        let markers = [];
+
+        // Charger le fichier CSV depuis GitHub Pages
+        Papa.parse('SUP_SUPPORT.txt', {
+            delimiter: ";",
+            encoding: "Windows-1252",
+            header: true,
+            download: true,
+            complete: function(results) {
+                allData = results.data;
+                populateStaSelect();
+            },
+            error: function(error) {
+                console.error("Erreur lors de la lecture du fichier :", error);
+            }
+        });
+
+        // Remplir le menu déroulant avec les STA_NM_ANFR uniques
+        function populateStaSelect() {
+            const staSelect = document.getElementById('staSelect');
+            const uniqueSta = [...new Set(allData.map(item => item.STA_NM_ANFR))];
+
+            uniqueSta.forEach(sta => {
+                const option = document.createElement('option');
+                option.value = sta;
+                option.textContent = sta;
+                staSelect.appendChild(option);
+            });
+
+            // Écouter le changement de sélection
+            staSelect.addEventListener('change', function() {
+                const selectedSta = this.value;
+                clearMarkers();
+                if (selectedSta) {
+                    displaySelectedSta(selectedSta);
+                }
+            });
+        }
+
+        // Effacer les marqueurs existants
+        function clearMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
+
+        // Afficher les supports pour le STA_NM_ANFR sélectionné
+        function displaySelectedSta(selectedSta) {
+            const filteredData = allData.filter(row => row.STA_NM_ANFR === selectedSta);
+            const tableData = [];
+
+            filteredData.forEach(row => {
+                const lat = parseFloat(row.COR_NB_DG_LAT) + parseFloat(row.COR_NB_MN_LAT)/60 + parseFloat(row.COR_NB_SC_LAT)/3600;
+                const latitude = row.COR_CD_NS_LAT === 'S' ? -lat : lat;
+
+                const lon = parseFloat(row.COR_NB_DG_LON) + parseFloat(row.COR_NB_MN_LON)/60 + parseFloat(row.COR_NB_SC_LON)/3600;
+                const longitude = row.COR_CD_EW_LON === 'W' ? -lon : lon;
+
+                const marker = L.marker([latitude, longitude]).addTo(map)
+                    .bindPopup(`<b>ID:</b> ${row.SUP_ID}<br><b>Nom:</b> ${row.STA_NM_ANFR}`);
+                markers.push(marker);
+
+                tableData.push({
+                    SUP_ID: row.SUP_ID,
+                    STA_NM_ANFR: row.STA_NM_ANFR,
+                    Latitude: latitude.toFixed(6),
+                    Longitude: longitude.toFixed(6)
+                });
+            });
+
+            // Ajuster la vue de la carte
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds());
+            }
+
+            // Afficher les données dans un tableau
+            let tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>SUP_ID</th>
+                            <th>STA_NM_ANFR</th>
+                            <th>Latitude</th>
+                            <th>Longitude</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            tableData.forEach(row => {
+                tableHTML += `
+                    <tr>
+                        <td>${row.SUP_ID}</td>
+                        <td>${row.STA_NM_ANFR}</td>
+                        <td>${row.Latitude}</td>
+                        <td>${row.Longitude}</td>
+                    </tr>
+                `;
+            });
+
+            tableHTML += `</tbody></table>`;
+            document.getElementById('result').innerHTML = tableHTML;
+        }
+
+        // Bouton de localisation
+        document.getElementById('locateMe').addEventListener('click', function() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        L.marker([lat, lon]).addTo(map)
+                            .bindPopup("<b>Vous êtes ici</b>")
+                            .openPopup();
+                        map.setView([lat, lon], 13);
+                    },
+                    function(error) {
+                        alert("Impossible de vous localiser : " + error.message);
+                    }
+                );
+            } else {
+                alert("La géolocalisation n'est pas supportée par votre navigateur.");
+            }
+        });
+    </script>
+</body>
+</html>
