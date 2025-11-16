@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec zoom dynamique</title>
+    <title>Carte Leaflet avec sup_support.txt</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -60,7 +60,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
-    <!-- Script Papa Parse pour lire le CSV -->
+    <!-- Script Papa Parse pour lire le fichier texte -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script>
         // Position de départ
@@ -205,15 +205,20 @@
             alert("Impossible de récupérer votre position : " + e.message);
         }
 
-        // Charger le fichier CSV
-        Papa.parse('resultat.csv', {
+        // Charger le fichier sup_support.txt
+        Papa.parse('SUP_SUPPORT.txt', {
             download: true,
+            delimiter: "\t",  // ou "," si c'est un CSV
             header: true,
             complete: function(results) {
                 stations = results.data;
                 // Afficher les 10 stations les plus proches de la position par défaut
                 const nearestStations = findNearestStations(stations, defaultLat, defaultLon);
                 displayStations(nearestStations);
+            },
+            error: function(error) {
+                console.error("Erreur de chargement du fichier :", error);
+                alert("Erreur lors du chargement du fichier sup_support.txt. Vérifiez qu'il est bien placé et accessible.");
             }
         });
 
