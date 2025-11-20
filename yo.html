@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec WMS et WFS cliquable</title>
+    <title>Carte Leaflet avec WMS cliquable</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -70,7 +70,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
         // Initialisation de la carte sans position centrale
         const map = L.map('map');
@@ -139,9 +138,18 @@
             // Ajuster la vue pour inclure le segment
             fitToSegment(userLat, userLon, latlng.lat, latlng.lng);
         }
-        // Ajout de la couche WMS Cartoradio (cliquable)
-        const wmsLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
-            layers: {'cartoradio:operateur','cartoradio:direction'},
+        // Ajout de la couche WMS Cartoradio (opérateur)
+        const wmsOperateurLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
+            layers: 'cartoradio:operateur',
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
+            attribution: 'Données <a href="https://cartoradio.fr">Cartoradio</a>',
+            opacity: 0.7
+        }).addTo(map);
+        // Ajout de la couche WMS Cartoradio (direction)
+        const wmsDirectionLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
+            layers: 'cartoradio:direction',
             format: 'image/png',
             transparent: true,
             version: '1.3.0',
