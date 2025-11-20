@@ -66,34 +66,28 @@
         <div id="azimuth">Azimuth: ---°</div>
     </div>
     <div class="legend">Supports Cartoradio</div>
-
     <!-- Script Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
     <script>
-        // Position de départ
+        // Position de départ (non utilisée pour le centrage initial)
         const defaultLat = 47.3513162;
         const defaultLon = -2.0982229;
-
-        // Initialisation de la carte
-        const map = L.map('map').setView([defaultLat, defaultLon], 13);
-        //L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        //    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        const ignLayer = L.tileLayer("https://data.geopf.fr/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&format=image/png&style=normal",
-            {
-                minZoom : 0,
-                maxZoom : 18,
-                tileSize : 256,
-                attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
+        // Initialisation de la carte sans position centrale
+        const map = L.map('map');
+        // Couche Géoportail
+        const ignLayer = L.tileLayer("https://data.geopf.fr/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&format=image/png&style=normal", {
+            minZoom: 0,
+            maxZoom: 18,
+            tileSize: 256,
+            attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
         }).addTo(map);
-
         // Variables globales
         let userLat, userLon;
         let selectedLine = null;
         let userCircle = null;
         let watchId = null;
-
         // Fonction pour calculer la distance entre deux points en km
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
@@ -105,7 +99,6 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
-
         // Fonction pour calculer l'azimuth entre deux points (en degrés)
         function calculateAzimuth(lat1, lon1, lat2, lon2) {
             const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
@@ -115,7 +108,6 @@
             azimuth = (azimuth + 360) % 360;
             return azimuth.toFixed(1);
         }
-
         // Fonction pour centrer et zoomer sur le segment
         function fitToSegment(lat1, lon1, lat2, lon2) {
             const bounds = [
@@ -124,39 +116,31 @@
             ];
             map.fitBounds(bounds, { padding: [50, 50] });
         }
-
         // Fonction pour gérer le clic sur un support WMS
         function onSupportClick(e) {
             if (!userLat || !userLon) return;
-
             // Récupérer les coordonnées du clic
             const latlng = e.latlng;
-
             // Effacer l'ancienne ligne
             if (selectedLine) {
                 map.removeLayer(selectedLine);
             }
-
             // Tracer une ligne entre le support et l'utilisateur
             selectedLine = L.polyline([
                 [userLat, userLon],
                 [latlng.lat, latlng.lng]
             ], {color: 'red'}).addTo(map);
-
             // Recalculer distance et azimuth
             const distance = calculateDistance(userLat, userLon, latlng.lat, latlng.lng);
             const azimuth = calculateAzimuth(latlng.lat, latlng.lng, userLat, userLon);
-
             // Afficher les informations (exemple de données simulées)
             document.getElementById('sup_id').textContent = `SUP_ID: EXEMPLE_${Math.floor(Math.random() * 1000)}`;
             document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: STATION_${Math.floor(Math.random() * 1000)}`;
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
-
             // Ajuster la vue pour inclure le segment
             fitToSegment(userLat, userLon, latlng.lat, latlng.lng);
         }
-
         // Ajout de la couche WMS Cartoradio (cliquable)
         const wmsLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
             layers: 'cartoradio:operateur',
@@ -166,19 +150,18 @@
             attribution: 'Données <a href="https://cartoradio.fr">Cartoradio</a>',
             opacity: 0.7
         }).addTo(map);
-
         // Activer l'interaction sur la couche WMS
         map.on('click', function(e) {
-            // Vérifier si le clic est sur un support (simplification)
-            // En pratique, il faudrait utiliser un GetFeatureInfo pour identifier le support exact
             onSupportClick(e);
         });
-
         // Géolocalisation de l'utilisateur (suivi continu)
         function onLocationFound(e) {
             userLat = e.latlng.lat;
             userLon = e.latlng.lng;
-
+            // Centre la carte sur la position de l'utilisateur uniquement si c'est la première fois
+            if (!map.getCenter().lat && !map.getCenter().lng) {
+                map.setView([userLat, userLon], 15);
+            }
             // Mettre à jour le cercle de l'utilisateur
             if (userCircle) {
                 map.removeLayer(userCircle);
@@ -190,11 +173,9 @@
                 radius: 10
             }).addTo(map);
         }
-
         function onLocationError(e) {
             alert("Impossible de récupérer votre position : " + e.message);
         }
-
         // Démarrer le suivi de la position
         function startWatching() {
             if (watchId) return;
@@ -202,7 +183,6 @@
             map.on('locationfound', onLocationFound);
             map.on('locationerror', onLocationError);
         }
-
         // Démarrer le suivi au chargement
         startWatching();
     </script>
