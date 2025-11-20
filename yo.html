@@ -141,7 +141,7 @@
         }
         // Ajout de la couche WMS Cartoradio (cliquable)
         const wmsLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
-            layers: 'cartoradio:operateur',
+            layers: {'cartoradio:operateur','cartoradio:direction'},
             format: 'image/png',
             transparent: true,
             version: '1.3.0',
@@ -183,29 +183,6 @@
         }
         // Démarrer le suivi au chargement
         startWatching();
-        // Ajout de la couche WFS Cartoradio:direction
-        function loadDirectionLayer() {
-            const wfsUrl = 'https://cartoradio.fr/geoserver/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=cartoradio:direction&outputFormat=application/json&srsName=EPSG:4326';
-            $.ajax({
-                url: wfsUrl,
-                dataType: 'json',
-                success: function(data) {
-                    L.geoJson(data, {
-                        style: function(feature) {
-                            return {color: 'green', weight: 2};
-                        },
-                        onEachFeature: function(feature, layer) {
-                            layer.bindPopup("Direction: " + (feature.properties.nom || 'Non renseigné'));
-                        }
-                    }).addTo(map);
-                },
-                error: function(e) {
-                    console.error("Erreur lors du chargement de la couche WFS : ", e);
-                }
-            });
-        }
-        // Charger la couche WFS après un court délai pour laisser le temps à la carte de s'initialiser
-        setTimeout(loadDirectionLayer, 1000);
     </script>
 </body>
 </html>
