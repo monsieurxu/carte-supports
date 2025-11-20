@@ -20,18 +20,17 @@
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/leaflet-tilelayer-wmts@2.2.3/dist/leaflet-tilelayer-wmts.min.js"></script>
     <script>
         // Initialisation de la carte
         const map = L.map('map').setView([45.735, -1.102], 14); // Centre par défaut (La Rochelle)
 
         // Ajout de la couche WMTS Géoportail
-        const ignLayer = L.tileLayer.wmts("https://data.geopf.fr/wmts", {
-            layer: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
-            style: 'normal',
-            tilematrixSet: 'PM_0_19',
-            format: 'image/png',
-            attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
+        const ignLayer = L.tileLayer("https://data.geopf.fr/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&format=image/png&style=normal",
+            {
+                minZoom : 0,
+                maxZoom : 18,
+                tileSize : 256,
+                attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
         }).addTo(map);
 
         // Fonction pour charger le GeoJSON en fonction de la bbox visible
