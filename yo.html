@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec WMS cliquable</title>
+    <title>Carte Leaflet avec WMS et WFS cliquable</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -70,10 +70,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        // Position de départ (non utilisée pour le centrage initial)
-        const defaultLat = 47.3513162;
-        const defaultLon = -2.0982229;
         // Initialisation de la carte sans position centrale
         const map = L.map('map');
         // Couche Géoportail
@@ -185,6 +183,29 @@
         }
         // Démarrer le suivi au chargement
         startWatching();
+        // Ajout de la couche WFS Cartoradio:direction
+        function loadDirectionLayer() {
+            const wfsUrl = 'https://cartoradio.fr/geoserver/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=cartoradio:direction&outputFormat=application/json&srsName=EPSG:4326';
+            $.ajax({
+                url: wfsUrl,
+                dataType: 'json',
+                success: function(data) {
+                    L.geoJson(data, {
+                        style: function(feature) {
+                            return {color: 'green', weight: 2};
+                        },
+                        onEachFeature: function(feature, layer) {
+                            layer.bindPopup("Direction: " + (feature.properties.nom || 'Non renseigné'));
+                        }
+                    }).addTo(map);
+                },
+                error: function(e) {
+                    console.error("Erreur lors du chargement de la couche WFS : ", e);
+                }
+            });
+        }
+        // Charger la couche WFS après un court délai pour laisser le temps à la carte de s'initialiser
+        setTimeout(loadDirectionLayer, 1000);
     </script>
 </body>
 </html>
