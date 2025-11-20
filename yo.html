@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte Leaflet avec sup_support.txt</title>
+    <title>Carte Leaflet avec WMS Cartoradio</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
@@ -43,25 +43,49 @@
             margin: 5px 0;
             padding: 2px 5px;
         }
+        #simulate-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            padding: 10px;
+            background: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
     <div id="info" class="info-panel">
-        <div id="sup_id"></div>
-        <div id="sta_nm_anfr"></div>
+        <div id="sup_id">SUP_ID: ---</div>
+        <div id="sta_nm_anfr">STA_NM_ANFR: ---</div>
     </div>
     <div id="geo" class="info-panel">
-        <div id="distance"></div>
-        <div id="azimuth"></div>
+        <div id="distance">Distance: --- km</div>
+        <div id="azimuth">Azimuth: ---°</div>
     </div>
+    <button id="simulate-btn">Simuler une station</button>
+    <div class="legend">Supports Cartoradio</div>
 
     <!-- Script Leaflet -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
             crossorigin=""></script>
-    <!-- Script Papa Parse pour lire le fichier texte -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
     <script>
         // Position de départ
         const defaultLat = 47.3513162;
@@ -69,21 +93,24 @@
 
         // Initialisation de la carte
         const map = L.map('map').setView([defaultLat, defaultLon], 13);
-        L.tileLayer("https://data.geopf.fr/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&format=image/png&style=normal",
-            {
-                minZoom : 0,
-                maxZoom : 18,
-                tileSize : 256,
-                attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Ajout de la couche WMS Cartoradio
+        const wmsLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
+            layers: 'cartoradio:operateur',
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
+            attribution: 'Données <a href="https://cartoradio.fr">Cartoradio</a>'
         }).addTo(map);
 
         // Variables globales
         let userLat, userLon;
         let selectedLine = null;
-        let selectedStation = null;
         let userCircle = null;
-        let stationsMarkers = [];
-        let stations = [];
+        let watchId = null;
 
         // Fonction pour calculer la distance entre deux points en km
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -107,35 +134,6 @@
             return azimuth.toFixed(1);
         }
 
-        // Fonction pour trouver les 10 stations les plus proches
-        function findNearestStations(stations, lat, lon, count = 10) {
-            return stations
-                .map(station => ({
-                    ...station,
-                    distance: calculateDistance(lat, lon, station.Latitude, station.Longitude),
-                    azimuth: calculateAzimuth(station.Latitude, station.Longitude, lat, lon)
-                }))
-                .sort((a, b) => a.distance - b.distance)
-                .slice(0, count);
-        }
-
-        // Fonction pour afficher les stations sur la carte
-        function displayStations(stations) {
-            stationsMarkers.forEach(marker => map.removeLayer(marker));
-            stationsMarkers = [];
-            stations.forEach(station => {
-                const marker = L.marker([station.Latitude, station.Longitude]).addTo(map);
-                marker.on('click', () => onStationSelected(station));
-                stationsMarkers.push(marker);
-            });
-        }
-
-        // Fonction appelée quand une station est sélectionnée
-        function onStationSelected(station) {
-            selectedStation = station;
-            updateSelectedStationInfo();
-        }
-
         // Fonction pour centrer et zoomer sur le segment
         function fitToSegment(lat1, lon1, lat2, lon2) {
             const bounds = [
@@ -145,41 +143,44 @@
             map.fitBounds(bounds, { padding: [50, 50] });
         }
 
-        // Fonction pour mettre à jour les infos de la station sélectionnée
-        function updateSelectedStationInfo() {
-            if (!selectedStation || !userLat || !userLon) return;
+        // Fonction pour simuler une station sélectionnée
+        function simulateStationSelection() {
+            if (!userLat || !userLon) return;
+
+            // Coordonnées d'une station simulée (exemple)
+            const simulatedStation = {
+                Latitude: userLat + 0.01,
+                Longitude: userLon + 0.01,
+                SUP_ID: "EXEMPLE123",
+                STA_NM_ANFR: "STATION_TEST"
+            };
 
             // Effacer l'ancienne ligne
             if (selectedLine) {
                 map.removeLayer(selectedLine);
             }
 
-            // Tracer une ligne entre la station et l'utilisateur
+            // Tracer une ligne entre la station simulée et l'utilisateur
             selectedLine = L.polyline([
                 [userLat, userLon],
-                [selectedStation.Latitude, selectedStation.Longitude]
+                [simulatedStation.Latitude, simulatedStation.Longitude]
             ], {color: 'red'}).addTo(map);
 
             // Recalculer distance et azimuth
-            const distance = calculateDistance(userLat, userLon, selectedStation.Latitude, selectedStation.Longitude);
-            const azimuth = calculateAzimuth(selectedStation.Latitude, selectedStation.Longitude, userLat, userLon);
+            const distance = calculateDistance(userLat, userLon, simulatedStation.Latitude, simulatedStation.Longitude);
+            const azimuth = calculateAzimuth(simulatedStation.Latitude, simulatedStation.Longitude, userLat, userLon);
 
             // Afficher les informations
-            document.getElementById('sup_id').textContent = `SUP_ID: ${selectedStation.SUP_ID}`;
-            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${selectedStation.STA_NM_ANFR}`;
+            document.getElementById('sup_id').textContent = `SUP_ID: ${simulatedStation.SUP_ID}`;
+            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${simulatedStation.STA_NM_ANFR}`;
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
 
             // Ajuster la vue pour inclure le segment
-            fitToSegment(userLat, userLon, selectedStation.Latitude, selectedStation.Longitude);
+            fitToSegment(userLat, userLon, simulatedStation.Latitude, simulatedStation.Longitude);
         }
 
-        // Fonction pour mettre à jour la position de l'utilisateur
-        function updateUserPosition() {
-            map.locate({setView: false});
-        }
-
-        // Géolocalisation de l'utilisateur
+        // Géolocalisation de l'utilisateur (suivi continu)
         function onLocationFound(e) {
             userLat = e.latlng.lat;
             userLon = e.latlng.lng;
@@ -194,45 +195,25 @@
                 fillOpacity: 1,
                 radius: 10
             }).addTo(map);
-
-            // Afficher les 10 stations les plus proches
-            const nearestStations = findNearestStations(stations, userLat, userLon);
-            displayStations(nearestStations);
-
-            // Mettre à jour les infos si une station est sélectionnée
-            if (selectedStation) {
-                updateSelectedStationInfo();
-            }
         }
 
         function onLocationError(e) {
             alert("Impossible de récupérer votre position : " + e.message);
         }
 
-        // Charger le fichier sup_support.txt
-        Papa.parse('SUP_SUPPORT.txt', {
-            download: true,
-            delimiter: "\t",  // ou "," si c'est un CSV
-            header: true,
-            complete: function(results) {
-                stations = results.data;
-                // Afficher les 10 stations les plus proches de la position par défaut
-                const nearestStations = findNearestStations(stations, defaultLat, defaultLon);
-                displayStations(nearestStations);
-            },
-            error: function(error) {
-                console.error("Erreur de chargement du fichier :", error);
-                alert("Erreur lors du chargement du fichier sup_support.txt. Vérifiez qu'il est bien placé et accessible.");
-            }
-        });
+        // Démarrer le suivi de la position
+        function startWatching() {
+            if (watchId) return; // Déjà en cours
+            watchId = map.locate({ watch: true, setView: false });
+            map.on('locationfound', onLocationFound);
+            map.on('locationerror', onLocationError);
+        }
 
-        // Demander la localisation de l'utilisateur
-        map.on('locationfound', onLocationFound);
-        map.on('locationerror', onLocationError);
-        map.locate({setView: true, maxZoom: 16});
+        // Bouton pour simuler une station
+        document.getElementById('simulate-btn').addEventListener('click', simulateStationSelection);
 
-        // Rafraîchir la position toutes les 10 secondes
-        setInterval(updateUserPosition, 10000);
+        // Démarrer le suivi au chargement
+        startWatching();
     </script>
 </body>
 </html>
