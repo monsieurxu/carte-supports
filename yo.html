@@ -116,11 +116,9 @@
             ];
             map.fitBounds(bounds, { padding: [50, 50] });
         }
-        // Fonction pour gérer le clic sur un support WMS
-        function onSupportClick(e) {
+        // Fonction pour gérer le clic sur une feature WMS
+        function onWmsClick(e) {
             if (!userLat || !userLon) return;
-            // Récupérer les coordonnées du clic
-            const latlng = e.latlng;
             // Effacer l'ancienne ligne
             if (selectedLine) {
                 map.removeLayer(selectedLine);
@@ -128,18 +126,18 @@
             // Tracer une ligne entre le support et l'utilisateur
             selectedLine = L.polyline([
                 [userLat, userLon],
-                [latlng.lat, latlng.lng]
+                [e.latlng.lat, e.latlng.lng]
             ], {color: 'red'}).addTo(map);
             // Recalculer distance et azimuth
-            const distance = calculateDistance(userLat, userLon, latlng.lat, latlng.lng);
-            const azimuth = calculateAzimuth(latlng.lat, latlng.lng, userLat, userLon);
+            const distance = calculateDistance(userLat, userLon, e.latlng.lat, e.latlng.lng);
+            const azimuth = calculateAzimuth(e.latlng.lat, e.latlng.lng, userLat, userLon);
             // Afficher les informations (exemple de données simulées)
             document.getElementById('sup_id').textContent = `SUP_ID: EXEMPLE_${Math.floor(Math.random() * 1000)}`;
             document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: STATION_${Math.floor(Math.random() * 1000)}`;
             document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
             document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
             // Ajuster la vue pour inclure le segment
-            fitToSegment(userLat, userLon, latlng.lat, latlng.lng);
+            fitToSegment(userLat, userLon, e.latlng.lat, e.latlng.lng);
         }
         // Ajout de la couche WMS Cartoradio (opérateur)
         const wmsOperateurLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
@@ -159,9 +157,32 @@
             attribution: 'Données <a href="https://cartoradio.fr">Cartoradio</a>',
             opacity: 0.7
         }).addTo(map);
-        // Activer l'interaction sur la couche WMS
+        // Fonction pour interroger les couches WMS au clic
         map.on('click', function(e) {
-            onSupportClick(e);
+            // Requête GetFeatureInfo sur la couche opérateur
+            const urlOperateur = wmsOperateurLayer.getFeatureInfoUrl(e.latlng);
+            if (urlOperateur) {
+                fetch(urlOperateur)
+                    .then(response => response.text())
+                    .then(text => {
+                        if (text.includes('Exception') || text.includes('null')) {
+                            // Requête GetFeatureInfo sur la couche direction
+                            const urlDirection = wmsDirectionLayer.getFeatureInfoUrl(e.latlng);
+                            if (urlDirection) {
+                                return fetch(urlDirection)
+                                    .then(response => response.text())
+                                    .then(text => {
+                                        if (!text.includes('Exception') && !text.includes('null')) {
+                                            onWmsClick(e);
+                                        }
+                                    });
+                            }
+                        } else {
+                            onWmsClick(e);
+                        }
+                    })
+                    .catch(error => console.error('Erreur GetFeatureInfo:', error));
+            }
         });
         // Géolocalisation de l'utilisateur (suivi continu)
         function onLocationFound(e) {
