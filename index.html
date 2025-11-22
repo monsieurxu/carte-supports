@@ -3,86 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte des sites radio (Géoportail)</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <title>Carte Leaflet avec WMS et points dynamiques</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
     <style>
         body, html {
             margin: 0;
             padding: 0;
             height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
         }
         #map {
-            width: 100%;
             height: 100%;
+            width: 100%;
+            position: relative;
+        }
+        .info-panel {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            max-width: 300px;
+            right: 10px;
+        }
+        #info {
+            top: 10px;
+        }
+        #geo {
+            bottom: 10px;
+        }
+        .info-panel div {
+            margin: 5px 0;
+            padding: 2px 5px;
+        }
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 12px;
+        }
+        .temp-marker {
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: red;
         }
     </style>
 </head>
 <body>
     <div id="map"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <div id="info" class="info-panel">
+        <div id="sup_id">SUP_ID: ---</div>
+        <div id="sta_nm_anfr">STA_NM_ANFR: ---</div>
+    </div>
+    <div id="geo" class="info-panel">
+        <div id="distance">Distance: --- km</div>
+        <div id="azimuth">Azimuth: ---°</div>
+    </div>
+    <div class="legend">Supports Cartoradio</div>
+    <!-- Script Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
     <script>
-        // Initialisation de la carte
-        const map = L.map('map').setView([45.735, -1.102], 14); // Centre par défaut (La Rochelle)
-
-        // Ajout de la couche WMTS Géoportail
-        const ignLayer = L.tileLayer("https://data.geopf.fr/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&format=image/png&style=normal",
-            {
-                minZoom : 0,
-                maxZoom : 18,
-                tileSize : 256,
-                attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
+        // Position de secours (centre de la France)
+        const defaultLat = 46.603354;
+        const defaultLon = 1.888334;
+        // Initialisation de la carte avec une vue par défaut
+        const map = L.map('map').setView([defaultLat, defaultLon], 6);
+        // Couche Géoportail
+        const ignLayer = L.tileLayer("https://data.geopf.fr/wmts?service=WMTS&request=GetTile&version=1.0.0&tilematrixset=PM&tilematrix={z}&tilecol={x}&tilerow={y}&layer=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&format=image/png&style=normal", {
+            minZoom: 0,
+            maxZoom: 18,
+            tileSize: 256,
+            attribution: '<a target="_blank" href="https://www.geoportail.gouv.fr/">Géoportail France</a>'
         }).addTo(map);
-
-        // Fonction pour charger le GeoJSON en fonction de la bbox visible
-        function loadGeoJSON() {
+        // Variables globales
+        let userLat, userLon;
+        let selectedLine = null;
+        let userCircle = null;
+        let watchId = null;
+        let sitesLayer = L.geoJson(null, {
+            pointToLayer: function(feature, latlng) {
+                return L.circleMarker(latlng, {
+                    radius: 4,
+                    fillColor: "#ff7800",
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).on('click', function(e) {
+                    onSiteClick(e.latlng, feature.properties);
+                });
+            }
+        }).addTo(map);
+        // Fonction pour calculer la distance entre deux points en km
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+        // Fonction pour calculer l'azimuth entre deux points (en degrés)
+        function calculateAzimuth(lat1, lon1, lat2, lon2) {
+            const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) -
+                      Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+            let azimuth = Math.atan2(y, x) * 180 / Math.PI;
+            azimuth = (azimuth + 360) % 360;
+            return azimuth.toFixed(1);
+        }
+        // Fonction pour centrer et zoomer sur le segment
+        function fitToSegment(lat1, lon1, lat2, lon2) {
+            const bounds = [
+                [lat1, lon1],
+                [lat2, lon2]
+            ];
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+        // Fonction pour gérer le clic sur un site
+        function onSiteClick(latlng, properties) {
+            if (!userLat || !userLon) {
+                alert("Votre position n'est pas encore disponible.");
+                return;
+            }
+            // Effacer l'ancienne ligne
+            if (selectedLine) {
+                map.removeLayer(selectedLine);
+            }
+            // Tracer une ligne entre le support et l'utilisateur
+            selectedLine = L.polyline([
+                [userLat, userLon],
+                [latlng.lat, latlng.lng]
+            ], {color: 'red', weight: 2}).addTo(map);
+            // Recalculer distance et azimuth
+            const distance = calculateDistance(userLat, userLon, latlng.lat, latlng.lng);
+            const azimuth = calculateAzimuth(latlng.lat, latlng.lng, userLat, userLon);
+            // Afficher les informations
+            document.getElementById('sup_id').textContent = `SUP_ID: ${properties.sup_id || '---'}`;
+            document.getElementById('sta_nm_anfr').textContent = `STA_NM_ANFR: ${properties.sta_nm_anfr || '---'}`;
+            document.getElementById('distance').textContent = `Distance: ${distance.toFixed(2)} km`;
+            document.getElementById('azimuth').textContent = `Azimuth: ${azimuth}°`;
+            // Ajuster la vue pour inclure le segment
+            fitToSegment(userLat, userLon, latlng.lat, latlng.lng);
+        }
+        // Ajout de la couche WMS Cartoradio (opérateur)
+        const wmsOperateurLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
+            layers: 'cartoradio:operateur',
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
+            attribution: 'Données <a href="https://cartoradio.fr">Cartoradio</a>',
+            opacity: 0.7
+        }).addTo(map);
+        // Ajout de la couche WMS Cartoradio (direction)
+        const wmsDirectionLayer = L.tileLayer.wms('https://cartoradio.fr/geoserver/wms', {
+            layers: 'cartoradio:direction',
+            format: 'image/png',
+            transparent: true,
+            version: '1.3.0',
+            attribution: 'Données <a href="https://cartoradio.fr">Cartoradio</a>',
+            opacity: 0.7
+        }).addTo(map);
+        // Fonction pour charger les sites dans la bbox actuelle
+        function loadSites() {
             const bounds = map.getBounds();
-            const bbox = [
-                bounds.getWest(),
-                bounds.getSouth(),
-                bounds.getEast(),
-                bounds.getNorth()
-            ].join(',');
-
-            const url = `https://cartoradio.fr/api/v1/sites?categories=TEL,TNT,AUTRES,RADIO,PMR,FH&technologies=2G,3G,4G,5G&operateurs=6,137,23,240,310&operateursnot=&operateurautre=true&enservice=false&format=geojson&bbox=${bbox}`;
-
+            const bbox = `${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()}`;
+            const url = `https://www.cartoradio.fr/api/v1/sites?categories=FH&technologies=2G,3G,4G,5G&operateurs=&operateursnot=&operateurautre=true&enservice=false&format=geojson&bbox=${bbox}`;
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    // Effacer les anciennes couches
-                    if (window.sitesLayer) {
-                        map.removeLayer(window.sitesLayer);
-                    }
-                    // Ajouter la nouvelle couche GeoJSON
-                    window.sitesLayer = L.geoJSON(data, {
-                        pointToLayer: function(feature, latlng) {
-                            return L.circleMarker(latlng, {
-                                radius: 5,
-                                fillColor: "#ff7800",
-                                color: "#000",
-                                weight: 1,
-                                opacity: 1,
-                                fillOpacity: 0.8
-                            }).bindPopup(`<b>${feature.properties.nom || 'Site sans nom'}</b><br>Catégorie: ${feature.properties.categorie || 'Inconnue'}`);
-                        }
-                    }).addTo(map);
+                    sitesLayer.clearLayers();
+                    sitesLayer.addData(data);
                 })
-                .catch(error => {
-                    console.error('Erreur lors du chargement des données:', error);
-                });
+                .catch(error => console.error('Erreur lors du chargement des sites:', error));
         }
-
-        // Géolocalisation
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(position => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                map.setView([lat, lng], 14);
-            });
+        // Charger les sites au démarrage et à chaque mouvement de carte
+        map.on('moveend', loadSites);
+        loadSites();
+        // Géolocalisation de l'utilisateur (suivi continu)
+        function onLocationFound(e) {
+            userLat = e.latlng.lat;
+            userLon = e.latlng.lng;
+            // Centre la carte sur la position de l'utilisateur
+            map.setView([userLat, userLon], 13);
+            // Mettre à jour le cercle de l'utilisateur
+            if (userCircle) {
+                map.removeLayer(userCircle);
+            }
+            userCircle = L.circle([userLat, userLon], {
+                color: 'blue',
+                fillColor: 'blue',
+                fillOpacity: 1,
+                radius: 10
+            }).addTo(map);
         }
-
-        // Charger les données au chargement et à chaque mouvement de carte
-        map.on('moveend', loadGeoJSON);
-        loadGeoJSON();
+        function onLocationError(e) {
+            console.warn("Géolocalisation impossible : ", e.message);
+        }
+        // Démarrer le suivi de la position
+        function startWatching() {
+            if (watchId) return;
+            watchId = map.locate({ watch: true, setView: false });
+            map.on('locationfound', onLocationFound);
+            map.on('locationerror', onLocationError);
+        }
+        // Démarrer le suivi au chargement
+        startWatching();
     </script>
 </body>
 </html>
